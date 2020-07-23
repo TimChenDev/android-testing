@@ -33,6 +33,7 @@ import io.ktor.client.request.post
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.util.KtorExperimentalAPI
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 /**
@@ -40,6 +41,15 @@ import timber.log.Timber
  */
 @KtorExperimentalAPI
 object TasksRemoteDataSource : TasksDataSource {
+
+    private const val SERVICE_LATENCY_IN_MILLIS = 2000L
+
+    private var TASKS_SERVICE_DATA = LinkedHashMap<String, Task>(2)
+
+    init {
+        addTask("Build tower in Pisa", "Ground looks good, no foundation work required.")
+        addTask("Finish bridge in Tacoma", "Found awesome girders at half the cost!")
+    }
 
     private const val SERVER_URL = "https://ktor-jib-57lqbht3qa-de.a.run.app"
 
@@ -64,7 +74,7 @@ object TasksRemoteDataSource : TasksDataSource {
                 is Error -> Error(tasks.exception)
                 is Success -> {
                     val task = tasks.data.firstOrNull() { it.id == taskId }
-                            ?: return@map Error(Exception("Not found"))
+                        ?: return@map Error(Exception("Not found"))
                     Success(task)
                 }
             }
@@ -83,10 +93,18 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun getTask(taskId: String): Result<Task> {
-        // NOT IMPLEMENTED
-        return Success(Task(title = "API NOT READY", description = "CAN'T GET TASK BY ID"))
+        // Simulate network by delaying the execution.
+        delay(SERVICE_LATENCY_IN_MILLIS)
+        TASKS_SERVICE_DATA[taskId]?.let {
+            return Success(it)
+        }
+        return Error(Exception("Task not found"))
     }
 
+    private fun addTask(title: String, description: String) {
+        val newTask = Task(title, description)
+        TASKS_SERVICE_DATA[newTask.id] = newTask
+    }
 
     override suspend fun saveTask(task: Task) {
 
@@ -117,15 +135,17 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun activateTask(taskId: String) {
-        // NOT IMPLEMENTED
+        // Not required for the remote data source
     }
 
     override suspend fun clearCompletedTasks() {
-        // NOT IMPLEMENTED
+        TASKS_SERVICE_DATA = TASKS_SERVICE_DATA.filterValues {
+            !it.isCompleted
+        } as LinkedHashMap<String, Task>
     }
 
     override suspend fun deleteAllTasks() {
-        // NOT IMPLEMENTED
+        TASKS_SERVICE_DATA.clear()
     }
 
     override suspend fun deleteTask(taskId: String) {
