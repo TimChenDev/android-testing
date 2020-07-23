@@ -27,6 +27,9 @@ android {
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_1_8.toString()
     }
+    packagingOptions {
+        pickFirst 'META-INF/*.kotlin_module'
+    }
 }
 
 dependencies {
@@ -53,6 +56,12 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:$archLifecycleVersion"
     implementation "androidx.navigation:navigation-fragment-ktx:$navigationVersion"
     implementation "androidx.navigation:navigation-ui-ktx:$navigationVersion"
+
+    implementation "io.ktor:ktor-client-android:$ktorVersion"
+    implementation "io.ktor:ktor-client-json:$ktorVersion"
+    implementation "io.ktor:ktor-client-gson:$ktorVersion"
+    implementation "io.ktor:ktor-client-okhttp:$ktorVersion"
+    implementation "com.squareup.okhttp3:logging-interceptor:$okHttpInterceptorVersion"
 
     // Dependencies for local unit tests
     testImplementation "junit:junit:$junitVersion"

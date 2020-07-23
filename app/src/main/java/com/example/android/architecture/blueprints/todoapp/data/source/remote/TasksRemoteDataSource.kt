@@ -23,11 +23,23 @@ import com.example.android.architecture.blueprints.todoapp.data.Result.Error
 import com.example.android.architecture.blueprints.todoapp.data.Result.Success
 import com.example.android.architecture.blueprints.todoapp.data.Task
 import com.example.android.architecture.blueprints.todoapp.data.source.TasksDataSource
+import com.example.android.architecture.blueprints.todoapp.util.httpClientAndroid
+import com.google.gson.annotations.SerializedName
+import io.ktor.client.call.NoTransformationFoundException
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.patch
+import io.ktor.client.request.post
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.util.KtorExperimentalAPI
 import kotlinx.coroutines.delay
+import timber.log.Timber
 
 /**
  * Implementation of the data source that adds a latency simulating network.
  */
+@KtorExperimentalAPI
 object TasksRemoteDataSource : TasksDataSource {
 
     private const val SERVICE_LATENCY_IN_MILLIS = 2000L
@@ -38,6 +50,8 @@ object TasksRemoteDataSource : TasksDataSource {
         addTask("Build tower in Pisa", "Ground looks good, no foundation work required.")
         addTask("Finish bridge in Tacoma", "Found awesome girders at half the cost!")
     }
+
+    private const val SERVER_URL = "https://ktor-jib-57lqbht3qa-de.a.run.app"
 
     private val observableTasks = MutableLiveData<Result<List<Task>>>()
 
@@ -68,9 +82,13 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun getTasks(): Result<List<Task>> {
-        // Simulate network by delaying the execution.
-        val tasks = TASKS_SERVICE_DATA.values.toList()
-        delay(SERVICE_LATENCY_IN_MILLIS)
+        val taskResponse =
+                httpClientAndroid.get<TaskListResponse>("$SERVER_URL/api/tasks")
+
+        val tasks = taskResponse.data.map {
+            Task(title = it.title, description = it.description, isCompleted = it.completed, id = it.id)
+        }
+
         return Success(tasks)
     }
 
@@ -89,16 +107,27 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun saveTask(task: Task) {
-        TASKS_SERVICE_DATA[task.id] = task
+
+        try {
+            httpClientAndroid.post<Task>("$SERVER_URL/api/tasks") {
+                contentType(ContentType.Application.Json)
+                body = TaskRequest(title = task.title, description = task.description)
+            }
+        } catch (e: NoTransformationFoundException) {
+            Timber.e("Error while saveTask:${e.message}")
+        }
     }
 
     override suspend fun completeTask(task: Task) {
-        val completedTask = Task(task.title, task.description, true, task.id)
-        TASKS_SERVICE_DATA[task.id] = completedTask
+
+        httpClientAndroid.patch<Unit>("$SERVER_URL/api/tasks/${task.id}/complete")
+
     }
 
     override suspend fun completeTask(taskId: String) {
-        // Not required for the remote data source
+
+        httpClientAndroid.patch<Unit>("$SERVER_URL/api/tasks/$taskId/complete")
+
     }
 
     override suspend fun activateTask(task: Task) {
@@ -121,6 +150,24 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun deleteTask(taskId: String) {
-        TASKS_SERVICE_DATA.remove(taskId)
+
+        httpClientAndroid.delete<Unit>("$SERVER_URL/api/tasks/$taskId/delete")
+
     }
 }
+
+data class TaskRequest(
+        val title: String,
+        val description: String
+)
+
+data class TaskListResponse(
+        @SerializedName("data") val data: List<TaskResponse>
+)
+
+data class TaskResponse(
+        @SerializedName("id") val id: String,
+        @SerializedName("title") val title: String,
+        @SerializedName("description") val description: String,
+        @SerializedName("completed") val completed: Boolean
+)
