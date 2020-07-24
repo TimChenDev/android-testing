@@ -82,14 +82,24 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun getTasks(): Result<List<Task>> {
-        val taskResponse =
+        try {
+            val taskResponse =
                 httpClientAndroid.get<TaskListResponse>("$SERVER_URL/api/tasks")
 
-        val tasks = taskResponse.data.map {
-            Task(title = it.title, description = it.description, isCompleted = it.completed, id = it.id)
-        }
+            val tasks = taskResponse.data.map {
+                Task(
+                    title = it.title,
+                    description = it.description,
+                    isCompleted = it.completed,
+                    id = it.id
+                )
+            }
 
-        return Success(tasks)
+            return Success(tasks)
+        } catch (e: java.lang.Exception) {
+            Timber.e("getTasks:$e")
+            return Success(listOf())
+        }
     }
 
     override suspend fun getTask(taskId: String): Result<Task> {
@@ -115,18 +125,26 @@ object TasksRemoteDataSource : TasksDataSource {
             }
         } catch (e: NoTransformationFoundException) {
             Timber.e("Error while saveTask:${e.message}")
+        } catch (e: java.lang.Exception) {
+            Timber.e("Error while saveTask:${e.message}")
         }
+
     }
 
     override suspend fun completeTask(task: Task) {
-
-        httpClientAndroid.patch<Unit>("$SERVER_URL/api/tasks/${task.id}/complete")
-
+        try {
+            httpClientAndroid.patch<Unit>("$SERVER_URL/api/tasks/${task.id}/complete")
+        } catch (e: java.lang.Exception) {
+            Timber.e("Error while completeTask:${e.message}")
+        }
     }
 
     override suspend fun completeTask(taskId: String) {
-
-        httpClientAndroid.patch<Unit>("$SERVER_URL/api/tasks/$taskId/complete")
+        try {
+            httpClientAndroid.patch<Unit>("$SERVER_URL/api/tasks/$taskId/complete")
+        } catch (e: java.lang.Exception) {
+            Timber.e("Error while completeTask by id:${e.message}")
+        }
 
     }
 
@@ -150,24 +168,26 @@ object TasksRemoteDataSource : TasksDataSource {
     }
 
     override suspend fun deleteTask(taskId: String) {
-
-        httpClientAndroid.delete<Unit>("$SERVER_URL/api/tasks/$taskId/delete")
-
+        try {
+            httpClientAndroid.delete<Unit>("$SERVER_URL/api/tasks/$taskId/delete")
+        } catch (e: java.lang.Exception) {
+            Timber.e("Error while deleteTask by id:${e.message}")
+        }
     }
 }
 
 data class TaskRequest(
-        val title: String,
-        val description: String
+    val title: String,
+    val description: String
 )
 
 data class TaskListResponse(
-        @SerializedName("data") val data: List<TaskResponse>
+    @SerializedName("data") val data: List<TaskResponse>
 )
 
 data class TaskResponse(
-        @SerializedName("id") val id: String,
-        @SerializedName("title") val title: String,
-        @SerializedName("description") val description: String,
-        @SerializedName("completed") val completed: Boolean
+    @SerializedName("id") val id: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("description") val description: String,
+    @SerializedName("completed") val completed: Boolean
 )
